@@ -1,8 +1,8 @@
 import random
+import pandas as pd
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
 
-# --- ML imports ---
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -11,9 +11,7 @@ from sklearn.metrics import classification_report, roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
 
 
-# -----------------------------
 # 1) Генератор тестовых транзакций
-# -----------------------------
 def generate_transactions(num=100, users=20, countries=("A", "B", "C", "D")):
     """
     Генерирует список транзакций:
@@ -46,9 +44,7 @@ def generate_transactions(num=100, users=20, countries=("A", "B", "C", "D")):
     return txns
 
 
-# -----------------------------
 # 2) Rule-based Fraud Detection + отчёт
-# -----------------------------
 def fraud_detection(
     transactions,
     amount_limit=10000,
@@ -105,9 +101,7 @@ def fraud_detection(
     return results
 
 
-# -----------------------------
 # 3) Синтетическая разметка fraud=1/0 (для демо ML)
-# -----------------------------
 def make_labels_for_ml(rule_results, noise=0.05):
     """
     В реальности разметка берётся из чарджбэков/расследований/кейсов.
@@ -133,9 +127,8 @@ def make_labels_for_ml(rule_results, noise=0.05):
         y.append(1 if random.random() < p else 0)
     return y
 
-# -----------------------------
+
 # 4) Формирование датасета признаков для ML
-# -----------------------------
 def build_ml_dataset(rule_results):
     """
     Возвращает X (list[dict]) и список имён фич.
@@ -155,9 +148,7 @@ def build_ml_dataset(rule_results):
     return X
 
 
-# -----------------------------
 # 5) Обучение ML-модели (scikit-learn)
-# -----------------------------
 def train_ml_model(X, y, random_state=42):
     """
     Модель: RandomForest + OneHotEncoder для страны.
@@ -167,6 +158,10 @@ def train_ml_model(X, y, random_state=42):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.25, random_state=random_state, stratify=y
     )
+
+    # Преобразуем списки словарей в DataFrame
+    X_train = pd.DataFrame(X_train)
+    X_test = pd.DataFrame(X_test)
 
     categorical = ["merchant_country"]
     numeric = ["amount", "txns_in_last_hour", "is_high_risk_country", "hour_of_day", "day_of_week"]
@@ -220,9 +215,7 @@ def train_ml_model(X, y, random_state=42):
     return clf
 
 
-# -----------------------------
 # 6) Печать rule-based отчёта
-# -----------------------------
 def print_rule_report(rule_results, limit=30):
     print("\n=== RULE-BASED REPORT (first rows) ===")
     for r in rule_results[:limit]:
@@ -237,10 +230,8 @@ def print_rule_report(rule_results, limit=30):
         print(f"... ({len(rule_results) - limit} more rows)")
 
 
-# -----------------------------
-# main
-# -----------------------------
-if name == "main":
+# запуск кода
+if __name__ == "__main__":
     random.seed(42)
 
     # 1) Генерируем данные
@@ -261,7 +252,7 @@ if name == "main":
     # 3) Делаем синтетические метки fraud=1/0
     y = make_labels_for_ml(rule_results, noise=0.05)
 
-# 4) Признаки для ML
+    # 4) Признаки для ML
     X = build_ml_dataset(rule_results)
 
     # 5) Обучаем модель и печатаем метрики
@@ -270,7 +261,8 @@ if name == "main":
     # Пример: применим модель к нескольким последним транзакциям и покажем риск-скор
     print("\n=== ML SCORING (last 10 transactions) ===")
     last10 = X[-10:]
-    proba = _clf.predict_proba(last10)[:, 1]
+    last10_df = pd.DataFrame(last10)
+    proba = _clf.predict_proba(last10_df)[:, 1]
     for i, p in enumerate(proba, start=1):
         print(f"txn(last-{11 - i}) fraud_proba={p:.3f}")
 
